@@ -1,246 +1,118 @@
-\# 校园自习座位预约系统
+# 校园自习座位预约系统（学生端）
 
+一个面向高校学生的轻量级自习座位预约系统 Demo。**前后端代码都在同一个文件夹（同一仓库）内**，本阶段只做**学生端**（不包含管理端/后台页面）。
 
+## 目标与范围（MVP）
 
-\## 项目简介
+- **支持的核心流程**：选区域/楼层 → 看座位状态 → 选择时段预约 → 到场占用/暂离 → 结束/超时释放 → 查看记录
+- **不在本阶段范围**：管理端、扫码/人脸签到、复杂审批、多校区多馆联动、支付/积分等
 
-校园自习座位预约系统是面向高校学生的轻量级预约管理平台，旨在解决图书馆、自习室座位占座混乱、找座耗时、管理效率低等校园痛点。本项目为 6 周实训 MVP 版本，聚焦核心预约流程，实现座位分区选择、时段预约、暂离报备、超时释放等关键功能，适配校园真实使用场景，支持学生端自助预约，整体架构轻量化、易部署。
+## 功能清单（学生端）
 
+- **座位状态查看**：按楼层/区域查看座位（空闲/已预约/占用/暂离）
+- **时段预约**：选择日期与时段（可配置规则：提前几天、每段时长、可预约次数等）
+- **取消预约**：未开始的预约可取消
+- **暂离**：暂离保留座位（例如 30 分钟），超时自动释放
+- **预约记录**：当前预约、历史预约
+- **违规限制（可选）**：累计违规达到阈值，限制次日预约
 
+## 技术栈（建议）
 
-\## 核心功能
+- **后端**：Java 17、Spring Boot 3、MyBatis-Plus、MySQL 8
+- **前端**：Vue 3、Vite、Element Plus（或纯 HTML/CSS/JS 也可）
+- **接口风格**：RESTful + JSON
 
-\### 👨‍🎓 学生端
+## 目录结构（前后端同目录）
 
-\- 座位可视化选择：按楼层/区域展示座位状态（空闲/已预约/占用）
+```text
+studySeat/
+├─ backend/                 # Spring Boot 后端（仅学生端接口）
+│  ├─ src/main/java/...      # controller/service/mapper/entity...
+│  └─ src/main/resources/
+│     └─ application.yml
+├─ frontend/                # Vue 前端（学生端页面）
+│  ├─ src/
+│  └─ package.json
+├─ docs/                    # 需求/原型/接口文档/测试用例（可选）
+└─ README.md
+```
 
-\- 时段预约：支持选择未来 7 天内的自习时段（默认每段 2 小时，可配置）
+## 快速开始（本地开发）
 
-\- 暂离报备：临时离开可报备，系统保留座位 30 分钟
+### 前置条件
 
-\- 预约记录：查看历史预约、当前有效预约，支持取消未开始的预约
+- **JDK**：17+
+- **Maven**：3.8+
+- **MySQL**：8.0+
+- **Node.js**：18+（推荐）
 
-\- 违规提醒：超时未离场累计 3 次，限制次日预约权限
+### 1) 数据库准备
 
+创建数据库（示例名）：`campus_seat_db`，字符集：`utf8mb4`。
 
+### 2) 启动后端
 
-\### 📌 非功能特性
+在 `backend/src/main/resources/application.yml` 配置数据库连接（示例）：
 
-\- 轻量化：无复杂依赖，本地/校园服务器均可部署
-
-\- 响应式：适配电脑、手机等多终端访问
-
-\- 低耦合：前后端分离，便于分工开发和功能扩展
-
-
-
-\## 技术栈
-
-\### 后端
-
-\- 开发语言：Java 17+
-
-\- 框架：Spring Boot 3.2（核心）、Spring MVC、MyBatis-Plus（数据访问）
-
-\- 数据库：MySQL 8.0（核心数据）
-
-\- 构建工具：Maven 3.8+
-
-\- API规范：RESTful API，支持JSON格式交互
-
-\- 其他：Lombok（简化代码）、Spring Validation（参数校验）
-
-
-
-\### 前端
-
-\- 核心框架：Vue 3 + Element Plus（或HTML+CSS+JS原生，降低难度）
-
-\- 构建工具：npm 8+ / yarn
-
-\- 适配：Flex布局实现响应式界面
-
-
-
-\### 部署
-
-\- 开发环境：Windows
-
-\- 运行环境：本地JDK 17+ / Tomcat 10+
-
-
-
-\## 快速开始
-
-\### 前置条件
-
-\- 安装 JDK 17+、Maven 3.8+、MySQL 8.0
-
-\- 前端需安装 Node.js 16+
-
-\- 配置 MySQL：创建数据库 `campus\_seat\_db`，字符集设为 `utf8mb4`
-
-
-
-\### 本地运行（Java+Spring Boot 版本）
-
-1\. 克隆/下载代码（实训阶段直接本地创建项目）
-
-&nbsp;  ```bash
-
-&nbsp;  # 实训中可省略克隆，直接在IDEA中创建Spring Boot项目
-
-&nbsp;  git clone <项目仓库地址>
-
-&nbsp;  cd campus-seat-reservation
-
-2\.配置数据库连接（修改 backend/src/main/resources/application.yml）
-
-yaml
-
+```yaml
 spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/campus_seat_db?useUnicode=true&characterEncoding=utf8mb4&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+server:
+  port: 8080
+```
 
-&nbsp; datasource:
+运行后端：
 
-&nbsp;   url: jdbc:mysql://localhost:3306/campus\_seat\_db?useUnicode=true\&characterEncoding=utf8mb4\&useSSL=false\&serverTimezone=Asia/Shanghai
-
-&nbsp;   username: root  # 替换为你的MySQL用户名
-
-&nbsp;   password: 123456  # 替换为你的MySQL密码
-
-&nbsp;   driver-class-name: com.mysql.cj.jdbc.Driver
-
-&nbsp; mybatis-plus:
-
-&nbsp;   mapper-locations: classpath:mapper/\*.xml
-
-&nbsp;   type-aliases-package: com.campus.seat.entity
-
-3\.启动后端服务
-
-方式 1（IDEA）：直接运行 BackendApplication.java 主类
-
-方式 2（Maven 命令）：
-
-bash
-
-运行
-
+```bash
 cd backend
-
-mvn clean compile
-
 mvn spring-boot:run
+```
 
-4\.初始化基础数据
+后端默认地址：`http://localhost:8080`
 
-项目启动后，访问 http://localhost:8080/api/init/data（需提前编写初始化接口）
+### 3) 启动前端
 
-自动创建管理员账号：admin / 123456
-
-5\.启动前端服务（若用 Vue）
-
-bash
-
-运行
-
+```bash
 cd frontend
+npm install
+npm run dev
+```
 
-npm install  # 安装依赖
+前端默认地址：`http://localhost:5173`
 
-npm run dev  # 启动开发服务器
+## 学生端接口约定（Demo 级）
 
-6\.访问系统
+> 下面是 README 里用于对齐前后端的**最小接口清单**，实现时可按实际命名调整。
 
-学生端：http://localhost:5173（前端） / http://localhost:8080/api（后端接口）
+### 座位与布局
 
+- `GET /api/student/areas`：区域/楼层列表
+- `GET /api/student/seats?areaId=...`：座位列表（含状态）
 
+### 预约
 
-项目目录结构（参考）
+- `POST /api/student/reservations`：创建预约（`seatId`、`startTime`、`endTime`）
+- `GET /api/student/reservations/current`：当前有效预约
+- `GET /api/student/reservations`：预约记录（分页/筛选可选）
+- `POST /api/student/reservations/{id}/cancel`：取消未开始预约
 
-plaintext
+### 暂离/结束
 
-campus-seat-reservation/
+- `POST /api/student/reservations/{id}/leave`：暂离（开始计时）
+- `POST /api/student/reservations/{id}/back`：返回（结束暂离）
+- `POST /api/student/reservations/{id}/finish`：结束使用（可选）
 
-├── backend/                # 后端Spring Boot项目
+## 约定与规范（建议）
 
-│   ├── src/main/java/com/campus/seat/
+- **统一返回结构**：`{ code, message, data }`
+- **时间字段**：统一使用 ISO-8601（例如 `2026-03-09T19:00:00`）
+- **跨域**：本地开发允许 `http://localhost:5173` 访问 `http://localhost:8080`
 
-│   │   ├── controller/     # 控制器（接口层）
+## License
 
-│   │   ├── service/        # 服务层（业务逻辑）
-
-│   │   ├── mapper/         # Mapper层（数据访问）
-
-│   │   ├── entity/         # 实体类（数据库映射）
-
-│   │   ├── dto/            # 数据传输对象
-
-│   │   ├── config/         # 配置类（MyBatis、跨域等）
-
-│   │   ├── utils/          # 工具类（时间、加密、响应结果）
-
-│   │   └── BackendApplication.java  # 启动类
-
-│   ├── src/main/resources/
-
-│   │   ├── application.yml # 核心配置
-
-│   │   ├── mapper/         # MyBatis XML映射文件
-
-│   │   └── static/         # 静态资源（可选）
-
-│   └── pom.xml             # Maven依赖
-
-├── frontend/               # 前端Vue项目
-
-│   ├── src/                # 源码（页面、组件、接口请求）
-
-│   │   ├── views/          # 页面视图
-
-│   │   ├── components/     # 通用组件
-
-│   │   ├── api/            # 接口请求封装
-
-│   │   └── main.js         # 前端入口
-
-│   └── package.json        # 前端依赖
-
-├── docs/                   # 文档（需求说明、测试用例、实训报告）
-
-└── README.md               # 项目说明（本文档）
-
-
-
-团队分工（适配 4-5 人实训团队）
-
-表格
-
-角色	核心职责	实训阶段产出物
-
-项目经理（1 人）	需求梳理、进度管控、文档编写、对接评审	项目启动书、周进度报告、最终实训报告
-
-后端开发（1-2 人）	数据库设计、接口开发、业务逻辑实现	后端代码、接口文档、数据库表结构
-
-前端开发（1 人）	页面开发、交互实现、多终端适配	前端代码、原型图、页面交互说明
-
-测试 / 运维（1 人）	功能测试、Bug 修复验证、部署文档编写	测试用例、Bug 清单、部署手册
-
-
-
-注意事项
-
-聚焦 MVP：优先实现核心预约功能，暂不开发扫码签到、人脸识别等非核心功能；
-
-代码规范：遵循阿里巴巴 Java 开发手册，统一变量命名、注释格式，每周提交代码并标注版本；
-
-依赖管理：在 pom.xml 中仅引入必要依赖（Spring Boot Web、MyBatis-Plus、MySQL 驱动、Lombok），避免冗余；
-
-文档同步：功能开发与文档编写同步进行，避免最后集中补文档；
-
-问题记录：建立 Bug 清单，记录解决过程，便于实训报告总结。
-
-许可证
-
-本项目为高校实训项目，采用 MIT 许可证，仅供学习使用。
+MIT（仅学习/实训用途）
 
