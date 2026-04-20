@@ -1,0 +1,24 @@
+-- Database schema for campus seat reservation
+CREATE TABLE IF NOT EXISTS area (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(128) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS seat (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  area_id BIGINT NOT NULL,
+  seat_no VARCHAR(64) NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'FREE',
+  CONSTRAINT fk_seat_area FOREIGN KEY (area_id) REFERENCES area(id)
+);
+
+CREATE TABLE IF NOT EXISTS reservation (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  seat_id BIGINT NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  start_time DATETIME NOT NULL,
+  end_time DATETIME NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  leave_start DATETIME NULL,
+  CONSTRAINT fk_res_seat FOREIGN KEY (seat_id) REFERENCES seat(id)
+);
