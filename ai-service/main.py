@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from agent import create_agent
+from agent import create_agent, chat_with_memory
 from tools import current_user_id
 
 app = FastAPI(title="StudySeat AI Service")
@@ -24,12 +24,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
     # Set user context so tools know which user is calling
     current_user_id.set(req.userId)
 
-    config = {"configurable": {"session_id": req.conversationId}}
-    result = agent.invoke(
-        {"messages": [("user", req.message)]},
-        config=config,
-    )
-    reply = result["messages"][-1].content
+    reply = chat_with_memory(agent, req.message, req.conversationId)
     return ChatResponse(reply=reply, conversationId=req.conversationId)
 
 

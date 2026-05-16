@@ -1,7 +1,7 @@
 from langchain_deepseek import ChatDeepSeek
 from langgraph.prebuilt import create_react_agent
 from langchain_community.chat_message_histories import SQLChatMessageHistory
-from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.messages import HumanMessage, AIMessage
 
 from config import DEEPSEEK_API_KEY, DEEPSEEK_MODEL
 from tools import (search_seats, create_reservation, cancel_reservation,
@@ -41,13 +41,32 @@ def create_agent():
         get_my_profile,
     ]
 
-    base_agent = create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
+    return create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
 
-    agent_with_memory = RunnableWithMessageHistory(
-        base_agent,
-        get_session_history,
-        input_messages_key="messages",
-        history_messages_key="history",
-    )
 
-    return agent_with_memory
+def chat_with_memory(agent, user_message: str, session_id: str) -> str:
+    """Send a message to the agent with full conversation history."""
+    history = get_session_history(session_id)
+
+    # Load all past messages from persistent store
+    all_messages = list(history.messages)  # returns List[BaseMessage]
+
+    # Build the messages list: all past + new user message
+    messages = []
+    for m in all_messages:
+        messages.append(m)
+
+    messages.append(HumanMessage(content=user_message))
+
+    # Invoke agent with full context
+    result = agent.invoke({"messages": messages})
+
+    # result["messages"] contains all messages including AI response
+    # Save all new messages back to persistent history
+    history.clear()
+    for m in result["messages"]:
+        history.add_message(m)
+
+    # Return the last AI message content
+    last_msg = result["messages"][-1]
+    return last_msg.content
