@@ -29,11 +29,21 @@
 export default {
   name: 'ChatPage',
   data() {
+    // Restore conversationId from localStorage so history survives refresh
+    let cid = localStorage.getItem('chatConversationId')
+    if (!cid) {
+      cid = crypto.randomUUID()
+      localStorage.setItem('chatConversationId', cid)
+    }
+    // Restore messages from localStorage if available
+    let saved = null
+    try { saved = JSON.parse(localStorage.getItem('chatMessages')) } catch(e) {}
+    const defaultMsg = [{ role: 'bot', content: '你好！我是校园自习助手 🎓\n\n我可以帮你：\n• 预约自习座位\n• 查询可用座位\n• 规划学习计划\n• 管理你的预约\n\n请问有什么需要？' }]
     return {
-      messages: [{ role: 'bot', content: '你好！我是校园自习助手 🎓\n\n我可以帮你：\n• 预约自习座位\n• 查询可用座位\n• 规划学习计划\n• 管理你的预约\n\n请问有什么需要？' }],
+      messages: (saved && saved.length > 0) ? saved : defaultMsg,
       input: '',
       loading: false,
-      conversationId: crypto.randomUUID(),
+      conversationId: cid,
     }
   },
   methods: {
@@ -62,6 +72,7 @@ export default {
         this.messages.push({ role: 'bot', content: '网络错误，请稍后重试' })
       } finally {
         this.loading = false
+        localStorage.setItem('chatMessages', JSON.stringify(this.messages))
         this.$nextTick(() => this.scrollBottom())
       }
     },

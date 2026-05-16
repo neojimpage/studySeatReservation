@@ -45,28 +45,31 @@ def create_agent():
 
 
 def chat_with_memory(agent, user_message: str, session_id: str) -> str:
-    """Send a message to the agent with full conversation history."""
+    """Send a message to the agent with full conversation history.
+
+    Memory strategy:
+    - SQLChatMessageHistory stores only clean user+AI message pairs in SQLite
+    - Each turn: load all past messages -> append new user message -> invoke agent
+    - After agent responds: save only the new user+AI pair to history
+    - Tool calls and internal agent messages are NOT persisted (they'd confuse the next turn)
+    """
     history = get_session_history(session_id)
 
-    # Load all past messages from persistent store
-    all_messages = list(history.messages)  # returns List[BaseMessage]
+    # Load past conversation (only clean user/AI pairs, no tool messages)
+    past_messages = list(history.messages)
 
-    # Build the messages list: all past + new user message
-    messages = []
-    for m in all_messages:
-        messages.append(m)
-
-    messages.append(HumanMessage(content=user_message))
+    # Build full input: past conversation + new user message
+    input_messages = past_messages + [HumanMessage(content=user_message)]
 
     # Invoke agent with full context
-    result = agent.invoke({"messages": messages})
+    result = agent.invoke({"messages": input_messages})
 
-    # result["messages"] contains all messages including AI response
-    # Save all new messages back to persistent history
-    history.clear()
-    for m in result["messages"]:
-        history.add_message(m)
+    # Extract only the final AI response (last message in agent output)
+    ai_response = result["messages"][-1].content
 
-    # Return the last AI message content
-    last_msg = result["messages"][-1]
-    return last_msg.content
+    # Save ONLY the new user+AI pair to persistent history
+    # Never save tool messages — they cause the agent to re-process old tool calls
+    history.add_message(HumanMessage(content=user_message))
+    history.add_message(AIMessage(content=ai_response))
+
+    return ai_response
