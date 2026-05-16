@@ -41,7 +41,7 @@ def create_agent():
         get_my_profile,
     ]
 
-    base_agent = create_react_agent(llm, tools, SYSTEM_PROMPT)
+    base_agent = create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
 
     agent_with_memory = RunnableWithMessageHistory(
         base_agent,
