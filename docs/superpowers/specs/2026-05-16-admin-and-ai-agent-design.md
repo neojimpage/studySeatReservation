@@ -1,4 +1,16 @@
-# 校园自习座位预约系统 — 管理端与 AI 对话智能体设计 Spec
+# 校园自习座位预约系统 — 管理端、AI 对话智能体、前端重设计 Spec
+
+## 全局视觉风格
+
+统一整个系统的 UI 风格：
+- **主色调**：紫色渐变 `#667eea → #764ba2`（按钮、头部、强调元素）
+- **背景色**：`#f5f6fa`（内容区）、白色（卡片）
+- **圆角**：卡片 12-16px，按钮 8-10px，输入框 8-10px
+- **状态色**：空闲 `#52c41a`、已预约 `#fa8c16`、占用 `#d9d9d9`、暂离 `#1890ff`、禁用/爽约 `#ff4d4f`
+- **阴影**：卡片 `0 1px 4px rgba(0,0,0,0.05)`，弹窗 `0 8px 32px rgba(0,0,0,0.15)`
+- **字体层级**：标题 16-18px bold，正文 13-14px，辅助 11-12px
+
+---
 
 ## Part 1: 管理端
 
@@ -233,6 +245,83 @@ deepseek:
 
 ---
 
+## Part 3: 学生端前端重设计
+
+### 概述
+
+对现有 4 个学生端页面进行视觉重设计，统一风格，与新增的管理端和 AI 助手页面保持一致。
+
+### 全局布局变更
+
+**App.vue**：去掉内部的居中 flex 布局和紫色渐变背景。改为：
+- 学生端：`#f5f6fa` 灰色背景，页面自身处理布局
+- 管理端：`AdminLayout` 自管理白色背景 + 侧边栏
+- 移除 `min-height: 100vh; display: flex; justify-content: center; align-items: center;`
+
+各页面自行处理容器样式。
+
+### Login.vue — 登录/注册
+
+从当前的简单白色卡片改造为：
+- 页面背景：紫色渐变 `#667eea → #764ba2`，全屏高度居中
+- 卡片：白色，`border-radius: 16px`，`box-shadow: 0 8px 32px rgba(0,0,0,0.15)`，宽度 360px
+- 顶部 Logo 区：圆角渐变图标（📚） + "自习座位预约" 标题 + "校园智能自习管理" 副标题
+- 输入框：`border-radius: 10px`，`border: 1.5px solid #e0e0e0`，focus 时紫色边框
+- 登录按钮：渐变紫色 `#667eea → #764ba2`，`border-radius: 10px`，白色文字
+- 注册链接文字改为 `#667eea`
+- 注册弹窗 Modal：白色圆角卡片，居中弹出
+
+### Home.vue — 首页座位浏览
+
+改造为完整页面布局（非居中卡片）：
+- **顶部导航栏**：白色背景，左侧标题"📚 自习座位预约"，右侧两个圆角按钮 — "🤖 AI 助手"（渐变紫色）和"👤 我的"（灰色）
+- **区域筛选栏**：页面内，下拉选择框带圆角和边框
+- **座位网格**：5 列网格，座位块 `aspect-ratio: 1`，圆角 10px，根据状态变色
+  - 空闲：`#e6f7ee` 背景 + `#52c41a` 边框 + "可预约"文字
+  - 已预约：`#fff1e6` + `#fa8c16`
+  - 占用：`#f0f0f0` + `#d9d9d9`
+  - 暂离：`#e6f7ff` + `#1890ff`
+  - 禁用：`#fff2f0` + `#ff4d4f`
+- **底部图例**：居中，简单文字 + 色块
+- **底部座位详情卡片**：白色圆角，选中座位时展示，含"预约"按钮
+- 点击"A I 助手"跳转 `/ai-assistant`，点击"我的"跳转 `/my-reservations`
+
+### SeatSelection.vue — 预约确认页
+
+- 页面背景：`#f5f6fa`
+- **顶部**：返回按钮 + "确认预约"标题
+- **座位信息卡片**：白色圆角卡片，左右分两列 — 座位号（A-01，大字体粗体）+ 区域（A区 · 1F）
+- **日期选择**：横向滚动，每天一个圆角方块，选中态渐变紫色，未选中白色带边框
+- **时段选择**：3 列网格，每个时段带状态 — 可选（白色边框）、已选（紫色填充）、不可选（灰色置灰）、推荐（绿色边框）
+- **确认按钮**：底部固定或随内容，渐变紫色全宽按钮
+
+### MyReservations.vue — 我的预约/个人中心
+
+- 页面背景：`#f5f6fa`
+- **顶部 Tab**：白色背景，三个等宽 Tab（当前预约 / 历史预约 / 个人中心），选中态底部紫色下划线 + 紫色文字
+- **预约卡片**：白色圆角卡片列表，每张卡片包含：
+  - 左侧：座位号（大字体） + 状态 badge（彩色圆角标签） + 日期时间 + 位置
+  - 右侧：操作按钮组（暂离蓝色、结束橙色、取消红色），小圆角按钮
+  - 状态 badge 颜色：已开始绿色、已预约橙色、暂离蓝色、已结束灰色、爽约红色、已取消红色
+- **个人中心 Tab**：白色圆角卡片展示用户信息（学号、姓名、违规次数含颜色标识、账号状态）
+- **退出登录按钮**：红色全宽按钮
+
+### 路由结构调整
+
+```
+/                  → Login.vue
+/home              → Home.vue
+/seat-selection    → SeatSelection.vue
+/my-reservations   → MyReservations.vue
+/ai-assistant      → ChatPage.vue       (新增)
+/admin/dashboard   → AdminLayout + Dashboard  (新增)
+/admin/areas       → AdminLayout + AreaManage  (新增)
+/admin/seats       → AdminLayout + SeatManage  (新增)
+/admin/users       → AdminLayout + UserManage  (新增)
+```
+
+---
+
 ## 整体文件变更汇总
 
 ### 新建文件
@@ -263,13 +352,22 @@ deepseek:
 | `backend/.../service/DataInitializer.java` | Insert preset admin account |
 | `backend/.../config/WebConfig.java` | Register admin auth interceptor |
 | `backend/.../resources/application.yml` | Add deepseek config |
+| `frontend/src/App.vue` | Remove centered flex/gradient; delegate to pages |
 | `frontend/src/router/index.js` | Add admin routes + ai-assistant route |
-| `frontend/src/views/Login.vue` | Role-based redirect after login |
-| `frontend/src/views/Home.vue` | Add "AI 助手" entry button |
+| `frontend/src/views/Login.vue` | Redesign with gradient bg, rounded card, logo area |
+| `frontend/src/views/Home.vue` | Redesign with top nav, AI button, grid layout |
+| `frontend/src/views/SeatSelection.vue` | Redesign with info card, date chips, time grids |
+| `frontend/src/views/MyReservations.vue` | Redesign with tab bar, card list, colored badges |
 
 ---
 
 ## 测试要点
+
+### 学生端重设计
+- 手动验证：登录页 → 首页座位浏览 → 点击座位进入预约页 → 选择日期时段 → 确认预约 → 我的预约页查看
+- 验证 AI 助手入口从首页可进入
+- 验证底部导航/顶部按钮跳转正确
+- 验证各状态座位颜色正确显示
 
 ### 管理端
 - AdminService 单测：CRUD area/seat, release seat, ban user, reset violations
