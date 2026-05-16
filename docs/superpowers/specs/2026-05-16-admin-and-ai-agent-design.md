@@ -126,122 +126,171 @@ Base: `/api/admin`
 Vue Chat 页面
     │  POST /api/student/chat  { message, conversationId }
     ▼
-ChatController
+Java ChatController  (薄代理层，转发请求)
+    │  POST /ai/chat  { message, conversationId, userId }
+    ▼
+Python FastAPI 服务  (LangChain 实现)
+    │  ① 加载对话记忆 (LCEL / RunnableWithMessageHistory)
+    │  ② 构建 system prompt + tool definitions → 调用 DeepSeek
+    ▼
+DeepSeek API  ──→  返回 tool_call 或 text reply
     │
+    ▼  (如果是 tool_call)
+LangChain Agent 执行工具
+    │  工具函数回调 Java 后端 API 查座位 / 创建预约 / 查记录
     ▼
-ChatService
-    │  ① 构建 system prompt + function definitions + 对话历史
-    ▼
-DeepSeek API  ──→  返回 function_call 或 text reply
-    │
-    ▼  (如果是 function_call)
-ChatService 执行工具调用
-    │  (查座位 / 创建预约 / 取消预约 / 查记录 / 查个人信息)
-    ▼
-结果回传 DeepSeek → 生成最终回复 → 返回前端
+结果回传 DeepSeek → 生成最终回复 → 返回 Java → 返回前端
 ```
 
-### 后端
+两服务关系：
+- **Java 后端** (8080)：业务数据 + 管理端 API + 学生端 API。ChatController 仅做转发 + 用户身份校验，不处理 LLM 逻辑。
+- **Python FastAPI 服务** (8000)：LangChain Agent + DeepSeek 调用 + 对话记忆。作为独立微服务，Java 通过 HTTP 调用。
 
-#### 新增 API
+### Python FastAPI 服务
 
-**Chat endpoint**
+#### 技术栈
+
+```
+fastapi + uvicorn
+langchain + langchain-deepseek + langchain-community
+```
+
+#### API
 
 | Method | Path | Body | Response |
 |--------|------|------|----------|
-| POST | `/api/student/chat` | `{ message, conversationId }` | `{ code, message, data: { reply, conversationId } }` |
+| POST | `/ai/chat` | `{ message, conversationId, userId }` | `{ reply, conversationId }` |
 
-conversationId 由前端生成（UUID），首次对话创建，后续复用，用于维护对话历史。
+#### LangChain 核心组件
 
-#### Function Definitions
+**1. Chat Model**
 
-注册给 LLM 的可用工具：
+```python
+from langchain_deepseek import ChatDeepSeek
 
-| Function | Parameters | Description |
-|----------|------------|-------------|
-| `search_seats` | `area` (optional), `date`, `startTime`, `endTime` | 查询指定日期时段的空闲座位 |
-| `create_reservation` | `seatId`, `startTime`, `endTime` | 为用户创建预约 |
-| `cancel_reservation` | `reservationId` | 取消指定预约 |
-| `get_my_reservations` | — | 查询当前用户的预约列表 |
-| `get_my_profile` | — | 查询用户个人信息（违规次数、限制状态） |
+llm = ChatDeepSeek(
+    model="deepseek-chat",
+    api_key=os.environ["DEEPSEEK_API_KEY"],
+    temperature=0.7,
+)
+```
 
-每个 function 执行前校验用户登录状态。`create_reservation` 执行时校验预约规则（次数限制、违规限制、时间冲突）。
+**2. Tools（@tool 装饰器）**
 
-#### System Prompt
+每个工具内部回调 Java 后端 API：
 
-角色设定："你是校园自习助手，帮助学生预约自习座位和规划学习计划。你应该先理解用户意图，必要时调用工具获取信息，最后用自然语言回复用户。"
+| Tool | 回调 Java API | Description |
+|------|--------------|-------------|
+| `search_seats(area, date, start_time, end_time)` | `GET /api/student/seats?areaId=` | 查询空闲座位 |
+| `create_reservation(seat_id, start_time, end_time)` | `POST /api/student/reservations` | 创建预约 |
+| `cancel_reservation(reservation_id)` | `POST /api/student/reservations/{id}/cancel` | 取消预约 |
+| `get_my_reservations()` | `GET /api/student/reservations?userId=` | 查询预约列表 |
+| `get_my_profile()` | `GET /api/student/users/{userId}` | 查询个人信息 |
 
-约束规则：
+工具通过 HTTP 回调 Java 后端时携带 `userId`，Java 端据此校验权限和执行操作。
+
+**3. System Prompt**
+
+```
+你是校园自习助手，帮助学生预约自习座位和规划学习计划。
+先理解用户意图，必要时调用工具获取信息，最后用自然语言回复。
+
+规则：
 - 预约前必须确认日期、时段、区域/座位偏好
 - 创建预约前需用户明确确认
-- 自习计划规划时，先查询可用座位再推荐，以表格呈现计划
-- 批量预约时逐个创建，失败时告知用户哪些成功哪些失败
+- 自习计划规划时先查可用座位，以表格呈现
+- 批量预约逐个创建，失败时说明原因
 - 回复简洁友好，使用中文
-
-#### 对话历史管理
-
-后端内存存储（ConcurrentHashMap<String, List<Message>>），key 为 conversationId。每条消息包含 role（system/user/assistant/tool）和 content。服务重启丢失，可接受。
-
-#### 新增文件
-
-| File | Purpose |
-|------|---------|
-| `backend/.../controller/ChatController.java` | Chat REST endpoint |
-| `backend/.../service/ChatService.java` | Chat logic interface |
-| `backend/.../service/impl/ChatServiceImpl.java` | LLM 调用 + 工具执行 |
-| `backend/.../config/DeepSeekConfig.java` | API Key 配置、HTTP Client Bean |
-
-#### application.yml 新增配置
-
-```yaml
-deepseek:
-  api-key: ${DEEPSEEK_API_KEY:your-api-key}
-  api-url: https://api.deepseek.com/v1/chat/completions
-  model: deepseek-chat
 ```
 
-### 前端
+**4. Agent + Memory**
 
-#### 路由
+使用 `create_react_agent` + `RunnableWithMessageHistory`：
+
+```python
+from langgraph.prebuilt import create_react_agent
+from langchain_community.chat_message_histories import SQLChatMessageHistory
+
+agent = create_react_agent(llm, tools, system_prompt)
+
+# 会话记忆持久化到 SQLite
+def get_session_history(session_id: str):
+    return SQLChatMessageHistory(
+        session_id=session_id,
+        connection="sqlite:///chat_history.db"
+    )
+
+agent_with_memory = RunnableWithMessageHistory(
+    agent, get_session_history,
+    input_messages_key="messages",
+)
+```
+
+- **记忆持久化**：SQLite (`chat_history.db`)，服务重启不丢失
+- **session_id** = Java 传来的 `conversationId`
+
+#### 项目结构
 
 ```
-/ai-assistant → ChatPage
+ai-service/
+├── main.py              # FastAPI app, /ai/chat endpoint
+├── agent.py             # LangChain agent + tools 定义
+├── tools.py             # 工具函数实现 (HTTP 回调 Java)
+├── config.py            # 配置 (DeepSeek key, Java base URL)
+├── requirements.txt     # fastapi, uvicorn, langchain, langchain-deepseek, ...
+└── chat_history.db      # SQLite (自动生成)
 ```
 
-#### 进入方式
+#### 配置
 
-在现有学生端主页（Home.vue）的顶部增加一个"AI 助手"按钮，点击跳转到 `/ai-assistant`。或在底部增加导航栏。
+```
+# .env
+DEEPSEEK_API_KEY=sk-xxx
+JAVA_BASE_URL=http://localhost:8080
+```
 
-#### ChatPage.vue
+### Java 后端变更
 
-全屏对话页面：
-- **顶部栏**：渐变紫色背景（与 App.vue 一致），显示"自习助手 · 在线"，左侧返回按钮，右侧关闭按钮
-- **消息列表**：滚动区域，用户消息靠右（紫色气泡），AI 消息靠左（白色气泡 + 头像），支持显示预约卡片和计划表格等富文本内容
-- **底部输入栏**：输入框 + 发送按钮，支持 Enter 发送
-- **自动滚动**：新消息到来时自动滚动到底部
-- **加载状态**：AI 思考时显示"对方正在输入..."动画
+#### ChatController
 
-#### 数据流
+简化为代理层：
 
-1. 页面挂载时生成 `conversationId = crypto.randomUUID()` 存入组件 data
-2. 用户发送消息 → `POST /api/student/chat`
-3. 收到回复后追加到消息列表
-4. 对话历史由后端维护，前端只存 conversationId
+```java
+@PostMapping("/chat")
+public Map<String, Object> chat(@RequestBody ChatRequest request) {
+    // 1. 校验用户登录
+    // 2. 转发到 Python 服务: POST http://localhost:8000/ai/chat
+    //    body: { message, conversationId, userId: currentUser.id }
+    // 3. 返回 { reply, conversationId } 给前端
+}
+```
+
+#### 新增/修改文件
+
+| File | Change |
+|------|--------|
+| `backend/.../controller/ChatController.java` | 新建，代理转发 |
+| `backend/.../dto/ChatRequest.java` | 新建 DTO |
+| `backend/.../resources/application.yml` | 新增 `ai-service.url: http://localhost:8000` |
+
+### 前端（不变）
+
+ChatPage.vue 仍然调用 Java 的 `POST /api/student/chat`，不感知 Python 服务。
 
 ### 自习计划规划流程
 
 用户："我周二三四下午有空，想每天学 2 小时高数" →
-1. LLM 解析意图 → 调用 `search_seats` 查询对应日期下午的可用座位
-2. LLM 整理结果，以表格呈现推荐计划（日期、时段、座位号）
-3. 用户确认 → LLM 逐个调用 `create_reservation`
-4. LLM 返回汇总结果（成功 N 个，失败 M 个及原因）
+1. LangChain Agent 解析意图 → 调用 `search_seats` 工具（工具内回调 Java API查可用座位）
+2. Agent 整理结果，以表格呈现推荐计划
+3. 用户确认 → Agent 逐个调用 `create_reservation` 工具
+4. Agent 返回汇总结果
 
 ### 错误处理
 
-- LLM API 调用超时（10s）→ 返回"助手暂时无法响应，请稍后重试"
-- Function 执行异常 → 返回错误信息给 LLM，LLM 转化为友好提示
-- 用户未登录 → 返回 `{ code: 401, message: "请先登录" }`
-- 当日预约次数已满 → LLM 友好提示用户
+- Python 服务不可用 → Java 返回 `{ code: 503, message: "AI 服务暂时不可用" }`
+- DeepSeek API 超时 (10s) → Agent 返回"助手暂时无法响应"
+- 工具回调 Java API 失败 → Agent 捕获异常并友好提示用户
+- 用户未登录 → Java ChatController 返回 401
 
 ---
 
@@ -332,10 +381,13 @@ deepseek:
 | `backend/.../service/AdminService.java` | Admin |
 | `backend/.../service/impl/AdminServiceImpl.java` | Admin |
 | `backend/.../config/AdminAuthInterceptor.java` | Admin |
-| `backend/.../controller/ChatController.java` | AI |
-| `backend/.../service/ChatService.java` | AI |
-| `backend/.../service/impl/ChatServiceImpl.java` | AI |
-| `backend/.../config/DeepSeekConfig.java` | AI |
+| `backend/.../controller/ChatController.java` | AI (代理转发) |
+| `backend/.../dto/ChatRequest.java` | AI |
+| `ai-service/main.py` | AI (FastAPI 入口) |
+| `ai-service/agent.py` | AI (LangChain Agent) |
+| `ai-service/tools.py` | AI (工具函数) |
+| `ai-service/config.py` | AI (配置) |
+| `ai-service/requirements.txt` | AI (依赖) |
 | `frontend/src/views/admin/AdminLayout.vue` | Admin |
 | `frontend/src/views/admin/Dashboard.vue` | Admin |
 | `frontend/src/views/admin/AreaManage.vue` | Admin |
@@ -351,7 +403,7 @@ deepseek:
 | `backend/.../controller/UserController.java` | Include `role` in login response |
 | `backend/.../service/DataInitializer.java` | Insert preset admin account |
 | `backend/.../config/WebConfig.java` | Register admin auth interceptor |
-| `backend/.../resources/application.yml` | Add deepseek config |
+| `backend/.../resources/application.yml` | Add `ai-service.url` config |
 | `frontend/src/App.vue` | Remove centered flex/gradient; delegate to pages |
 | `frontend/src/router/index.js` | Add admin routes + ai-assistant route |
 | `frontend/src/views/Login.vue` | Redesign with gradient bg, rounded card, logo area |
@@ -375,7 +427,8 @@ deepseek:
 - 手动流程：登录 admin → 仪表盘 → 创建区域 → 添加座位 → 封禁用户 → 以该用户登录验证
 
 ### AI 智能体
-- ChatService 单测：mock DeepSeek 响应，验证 function call 执行正确
-- ChatController 集成测：验证对话流程（查座位 → 预约 → 返回）
-- 手动流程：登录学生 → 进入 AI 助手 → "帮我查明天下午的空位" → 选择座位 → 确认预约
-- 自习计划场景："帮我规划下周高数学习计划" → 确认 → 验证多天预约全部创建
+- Python 服务单测：mock DeepSeek 响应，验证 Agent 工具调用逻辑
+- FastAPI 集成测：验证 `/ai/chat` 端到端对话流程
+- Java ChatController 集成测：验证代理转发和 401/503 处理
+- 手动流程：启动 Java + Python → 进入 AI 助手 → "帮我查明天下午的空位" → 确认预约
+- 自习计划场景："帮我规划下周学习计划" → 确认 → 验证批量预约
