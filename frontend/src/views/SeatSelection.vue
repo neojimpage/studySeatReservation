@@ -1,45 +1,45 @@
 <template>
-  <div class="seat-selection-container">
+  <div class="page">
     <div class="header">
-      <button class="back-button" @click="$router.back()">返回</button>
-      <h2>选择座位</h2>
+      <button class="back-btn" @click="$router.back()">←</button>
+      <h3>确认预约</h3>
     </div>
-    
-    <div class="seat-info">
-      <div class="info-item">
-        <span class="label">座位号：</span>
-        <span class="value">{{ selectedSeat?.seatNumber || '未选择' }}</span>
+
+    <div class="info-card">
+      <div class="info-left">
+        <span class="label">座位</span>
+        <span class="value">{{ selectedSeat?.seatNumber || '--' }}</span>
       </div>
-      <div class="info-item">
-        <span class="label">区域：</span>
-        <span class="value">{{ selectedArea?.name || '未选择' }}</span>
-      </div>
-    </div>
-    
-    <div class="time-selection">
-      <h3>选择日期</h3>
-      <div class="date-picker">
-        <button v-for="(date, index) in availableDates" :key="index" 
-                :class="['date-button', { active: selectedDate === date.date }]"
-                @click="selectDate(date)">
-          <div class="date-day">{{ date.day }}</div>
-          <div class="date-date">{{ date.date }}</div>
-        </button>
-      </div>
-      
-      <h3>选择时段</h3>
-      <div class="time-slots">
-        <button v-for="(slot, index) in timeSlots" :key="index" 
-                :class="['time-slot', { available: slot.available, active: selectedSlot === slot }]"
-                @click="selectTimeSlot(slot)">
-          <span>{{ slot.startTime }} - {{ slot.endTime }}</span>
-        </button>
+      <div class="info-right">
+        <span class="label">区域</span>
+        <span class="value">{{ selectedArea?.name || '--' }} · {{ selectedArea?.floor }}F</span>
       </div>
     </div>
-    
-    <button class="confirm-button" @click="confirmReservation" :disabled="!selectedDate || !selectedSlot || !selectedSlot.available">
-      确认预约
-    </button>
+
+    <div class="section">
+      <span class="section-label">选择日期</span>
+      <div class="date-row">
+        <div v-for="d in dates" :key="d.date"
+             :class="['date-chip', { active: selectedDate === d.date }]"
+             @click="selectedDate = d.date">
+          <span>{{ d.day }}</span>
+          <strong>{{ d.short }}</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <span class="section-label">选择时段</span>
+      <div class="slot-grid">
+        <div v-for="s in slots" :key="s.start"
+             :class="['slot', { active: selectedSlot === s, disabled: !s.available }]"
+             @click="selectSlot(s)">
+          {{ s.start }} - {{ s.end }}
+        </div>
+      </div>
+    </div>
+
+    <button class="confirm-btn" :disabled="!canConfirm" @click="confirmReservation">确认预约</button>
   </div>
 </template>
 
@@ -50,260 +50,102 @@ export default {
     return {
       selectedSeat: null,
       selectedArea: null,
-      availableDates: [],
       selectedDate: '',
-      timeSlots: [
-        { startTime: '08:00', endTime: '10:00', available: true },
-        { startTime: '10:00', endTime: '12:00', available: true },
-        { startTime: '14:00', endTime: '16:00', available: true },
-        { startTime: '16:00', endTime: '18:00', available: true },
-        { startTime: '18:00', endTime: '20:00', available: true },
-        { startTime: '20:00', endTime: '22:00', available: true }
-      ],
-      selectedSlot: null
+      selectedSlot: null,
+      dates: [],
+      slots: [
+        { start: '08:00', end: '10:00', available: true },
+        { start: '10:00', end: '12:00', available: true },
+        { start: '14:00', end: '16:00', available: true },
+        { start: '16:00', end: '18:00', available: true },
+        { start: '18:00', end: '20:00', available: true },
+        { start: '20:00', end: '22:00', available: false },
+      ]
     }
   },
-  mounted() {
-    this.initData()
-    this.generateAvailableDates()
+  computed: {
+    canConfirm() { return this.selectedDate && this.selectedSlot && this.selectedSlot.available }
   },
+  mounted() { this.initData(); this.genDates() },
   methods: {
     async initData() {
-      const seatId = this.$route.query.seatId
-      const areaId = this.$route.query.areaId
-      if (seatId && areaId) {
-        // 获取座位信息
-        const seatResponse = await fetch(`/api/student/seats/${seatId}`)
-        const seatResult = await seatResponse.json()
-        if (seatResult.code === 200) {
-          this.selectedSeat = seatResult.data
-        }
-        
-        // 获取区域信息
-        const areaResponse = await fetch(`/api/student/areas/${areaId}`)
-        const areaResult = await areaResponse.json()
-        if (areaResult.code === 200) {
-          this.selectedArea = areaResult.data
-        }
+      const seatId = this.$route.query.seatId, areaId = this.$route.query.areaId
+      if (seatId) {
+        const r = await fetch(`/api/student/seats/${seatId}`)
+        const j = await r.json(); if (j.code === 200) this.selectedSeat = j.data
+      }
+      if (areaId) {
+        const r = await fetch(`/api/student/areas`)
+        const j = await r.json()
+        if (j.code === 200) this.selectedArea = j.data.find(a => a.id == areaId)
       }
     },
-    generateAvailableDates() {
-      const dates = []
-      const today = new Date()
+    genDates() {
+      const days = ['周日','周一','周二','周三','周四','周五','周六']
+      const now = new Date()
       for (let i = 0; i < 7; i++) {
-        const date = new Date(today)
-        date.setDate(today.getDate() + i)
-        const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
-        dates.push({
-          day: dayNames[date.getDay()],
-          date: date.toISOString().split('T')[0]
+        const d = new Date(now); d.setDate(now.getDate() + i)
+        this.dates.push({
+          day: days[d.getDay()],
+          short: `${d.getMonth()+1}/${d.getDate()}`,
+          date: d.toISOString().split('T')[0]
         })
       }
-      this.availableDates = dates
-      this.selectedDate = dates[0].date
+      this.selectedDate = this.dates[0].date
     },
-    selectDate(date) {
-      this.selectedDate = date.date
-      this.selectedSlot = null
-      // 这里可以根据日期和座位查询可用时段
-    },
-    selectTimeSlot(slot) {
-      if (slot.available) {
-        this.selectedSlot = slot
-      }
-    },
+    selectSlot(s) { if (s.available) this.selectedSlot = s },
     async confirmReservation() {
-      if (!this.selectedDate || !this.selectedSlot || !this.selectedSlot.available) {
-        return
-      }
-      
       const user = JSON.parse(localStorage.getItem('user'))
-      if (!user) {
-        alert('请先登录')
-        this.$router.push('/')
-        return
-      }
-      
-      const startTime = `${this.selectedDate}T${this.selectedSlot.startTime}:00`
-      const endTime = `${this.selectedDate}T${this.selectedSlot.endTime}:00`
-      
-      const response = await fetch('/api/student/reservations', {
+      if (!user) { alert('请先登录'); this.$router.push('/'); return }
+      const start = `${this.selectedDate}T${this.selectedSlot.start}:00`
+      const end = `${this.selectedDate}T${this.selectedSlot.end}:00`
+      const r = await fetch('/api/student/reservations', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-          userId: user.id,
-          seatId: this.selectedSeat.id,
-          startTime: startTime,
-          endTime: endTime
-        })
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ userId: user.id, seatId: this.selectedSeat.id, startTime: start, endTime: end })
       })
-      
-      const result = await response.json()
-      if (result.code === 200) {
-        alert('预约成功')
-        this.$router.push('/my-reservations')
-      } else {
-        alert(result.message)
-      }
+      const j = await r.json()
+      if (j.code === 200) { alert('预约成功'); this.$router.push('/my-reservations') }
+      else alert(j.message)
     }
   }
 }
 </script>
 
 <style scoped>
-.seat-selection-container {
-  background: white;
-  border-radius: 10px;
-  padding: 30px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 600px;
+.page { min-height: 100vh; background: #f5f6fa; padding: 0 20px 30px; }
+.header { display: flex; align-items: center; padding: 16px 0; }
+.back-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: #666; margin-right: 12px; }
+.header h3 { font-size: 17px; color: #333; margin: 0; }
+.info-card {
+  background: white; border-radius: 12px; padding: 18px; margin-bottom: 20px;
+  display: flex; justify-content: space-between; box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
-
-.header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 30px;
+.info-left, .info-right { display: flex; flex-direction: column; }
+.label { font-size: 12px; color: #999; }
+.value { font-size: 16px; font-weight: bold; color: #333; margin-top: 4px; }
+.section { margin-bottom: 20px; }
+.section-label { font-size: 13px; color: #666; display: block; margin-bottom: 8px; }
+.date-row { display: flex; gap: 8px; overflow-x: auto; }
+.date-chip {
+  flex-shrink: 0; padding: 10px 14px; background: white; border: 1.5px solid #e0e0e0;
+  border-radius: 10px; text-align: center; cursor: pointer; min-width: 54px;
+  font-size: 13px;
 }
-
-.back-button {
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-  margin-right: 20px;
-  color: #666;
+.date-chip strong { display: block; }
+.date-chip.active { background: #667eea; color: white; border-color: #667eea; }
+.slot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.slot {
+  padding: 10px; background: white; border: 1.5px solid #e0e0e0;
+  border-radius: 8px; text-align: center; font-size: 13px; cursor: pointer;
 }
-
-.header h2 {
-  color: #333;
+.slot.active { background: #667eea; color: white; border-color: #667eea; font-weight: bold; }
+.slot.disabled { background: #f0f0f0; color: #ccc; cursor: not-allowed; }
+.confirm-btn {
+  width: 100%; padding: 14px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white; border: none; border-radius: 10px; font-size: 16px;
+  font-weight: bold; cursor: pointer; margin-top: 8px;
 }
-
-.seat-info {
-  background: #f5f5f5;
-  padding: 20px;
-  border-radius: 10px;
-  margin-bottom: 30px;
-}
-
-.info-item {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.info-item:last-child {
-  margin-bottom: 0;
-}
-
-.label {
-  color: #666;
-  font-weight: bold;
-}
-
-.value {
-  color: #333;
-}
-
-.time-selection {
-  margin-bottom: 30px;
-}
-
-.time-selection h3 {
-  color: #333;
-  margin-bottom: 15px;
-  font-size: 16px;
-}
-
-.date-picker {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 30px;
-  overflow-x: auto;
-  padding-bottom: 10px;
-}
-
-.date-button {
-  flex: 1;
-  min-width: 80px;
-  padding: 15px;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  background: white;
-  cursor: pointer;
-  text-align: center;
-  transition: all 0.3s ease;
-}
-
-.date-button.active {
-  background: #4a6cf7;
-  color: white;
-  border-color: #4a6cf7;
-}
-
-.date-day {
-  font-size: 14px;
-  margin-bottom: 5px;
-}
-
-.date-date {
-  font-size: 16px;
-  font-weight: bold;
-}
-
-.time-slots {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
-}
-
-.time-slot {
-  padding: 15px;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  background: #f5f5f5;
-  cursor: not-allowed;
-  text-align: center;
-  transition: all 0.3s ease;
-}
-
-.time-slot.available {
-  background: white;
-  cursor: pointer;
-}
-
-.time-slot.available:hover {
-  border-color: #4a6cf7;
-  color: #4a6cf7;
-}
-
-.time-slot.active {
-  background: #4a6cf7;
-  color: white;
-  border-color: #4a6cf7;
-}
-
-.confirm-button {
-  width: 100%;
-  padding: 15px;
-  background: #4a6cf7;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.confirm-button:hover:not(:disabled) {
-  background: #3a56d7;
-}
-
-.confirm-button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
+.confirm-btn:disabled { background: #ccc; cursor: not-allowed; }
 </style>

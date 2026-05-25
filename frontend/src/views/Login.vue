@@ -1,37 +1,37 @@
 <template>
-  <div class="login-container">
+  <div class="login-page">
     <div class="login-card">
-      <h2 class="login-title">学生端登录</h2>
-      <div class="form-group">
-        <label for="studentId">学号</label>
-        <input type="text" id="studentId" v-model="studentId" placeholder="请输入学号" />
+      <div class="logo-area">
+        <div class="logo-icon">📚</div>
+        <h2>自习座位预约</h2>
+        <p>校园智能自习管理</p>
       </div>
       <div class="form-group">
-        <label for="password">姓名</label>
-        <input type="text" id="password" v-model="password" placeholder="请输入姓名" />
+        <label>学号</label>
+        <input type="text" v-model="studentId" placeholder="请输入学号" />
       </div>
-      <button class="login-button" @click="login">登录</button>
-      <div class="register-link">
-        <span>还没有账号？</span>
-        <a href="#" @click.prevent="showRegister = true">立即注册</a>
+      <div class="form-group">
+        <label>姓名</label>
+        <input type="text" v-model="password" placeholder="请输入姓名" />
       </div>
+      <button class="login-btn" @click="login">登 录</button>
+      <p class="register-link">还没有账号？<a href="#" @click.prevent="showRegister = true">立即注册</a></p>
     </div>
-    
-    <!-- 注册弹窗 -->
-    <div v-if="showRegister" class="modal">
-      <div class="modal-content">
+
+    <div v-if="showRegister" class="modal-overlay" @click.self="showRegister = false">
+      <div class="modal-card">
         <h3>学生注册</h3>
         <div class="form-group">
-          <label for="registerStudentId">学号</label>
-          <input type="text" id="registerStudentId" v-model="registerStudentId" placeholder="请输入学号" />
+          <label>学号</label>
+          <input type="text" v-model="registerStudentId" placeholder="请输入学号" />
         </div>
         <div class="form-group">
-          <label for="registerName">姓名</label>
-          <input type="text" id="registerName" v-model="registerName" placeholder="请输入姓名" />
+          <label>姓名</label>
+          <input type="text" v-model="registerName" placeholder="请输入姓名" />
         </div>
         <div class="modal-buttons">
-          <button @click="register">注册</button>
-          <button @click="showRegister = false">取消</button>
+          <button class="btn-primary" @click="register">注册</button>
+          <button class="btn-cancel" @click="showRegister = false">取消</button>
         </div>
       </div>
     </div>
@@ -54,18 +54,17 @@ export default {
     async login() {
       const response = await fetch('/api/student/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-          studentId: this.studentId,
-          password: this.password
-        })
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ studentId: this.studentId, password: this.password })
       })
       const result = await response.json()
       if (result.code === 200) {
         localStorage.setItem('user', JSON.stringify(result.data))
-        this.$router.push('/home')
+        if (result.data.role === 'admin') {
+          this.$router.push('/admin/dashboard')
+        } else {
+          this.$router.push('/home')
+        }
       } else {
         alert(result.message)
       }
@@ -73,13 +72,8 @@ export default {
     async register() {
       const response = await fetch('/api/student/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-          studentId: this.registerStudentId,
-          name: this.registerName
-        })
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ studentId: this.registerStudentId, name: this.registerName })
       })
       const result = await response.json()
       if (result.code === 200) {
@@ -94,125 +88,66 @@ export default {
 </script>
 
 <style scoped>
-.login-container {
-  width: 100%;
-  max-width: 400px;
+.login-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 20px;
 }
-
 .login-card {
   background: white;
-  border-radius: 10px;
-  padding: 30px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  padding: 36px 28px;
+  width: 360px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
 }
-
-.login-title {
+.logo-area {
   text-align: center;
-  margin-bottom: 30px;
-  color: #333;
+  margin-bottom: 28px;
 }
-
-.form-group {
-  margin-bottom: 20px;
+.logo-icon {
+  width: 56px; height: 56px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 14px;
+  margin: 0 auto 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
 }
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: #666;
-  font-size: 14px;
-}
-
+.logo-area h2 { color: #333; font-size: 18px; margin: 0; }
+.logo-area p { color: #999; font-size: 13px; margin: 4px 0 0; }
+.form-group { margin-bottom: 18px; }
+.form-group label { font-size: 13px; color: #666; display: block; margin-bottom: 6px; }
 .form-group input {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 16px;
+  width: 100%; padding: 10px 14px;
+  border: 1.5px solid #e0e0e0; border-radius: 10px;
+  font-size: 14px; outline: none; transition: border-color 0.3s;
 }
-
-.login-button {
-  width: 100%;
-  padding: 12px;
-  background: #4a6cf7;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  margin-bottom: 20px;
+.form-group input:focus { border-color: #667eea; }
+.login-btn {
+  width: 100%; padding: 12px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white; border: none; border-radius: 10px;
+  font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 16px;
 }
-
-.login-button:hover {
-  background: #3a56d7;
+.register-link { text-align: center; font-size: 13px; color: #999; }
+.register-link a { color: #667eea; text-decoration: none; }
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
 }
-
-.register-link {
-  text-align: center;
-  font-size: 14px;
-  color: #666;
+.modal-card {
+  background: white; border-radius: 16px; padding: 30px; width: 360px;
 }
-
-.register-link a {
-  color: #4a6cf7;
-  text-decoration: none;
-  margin-left: 5px;
+.modal-card h3 { margin-bottom: 20px; text-align: center; color: #333; }
+.modal-buttons { display: flex; gap: 12px; margin-top: 20px; }
+.btn-primary {
+  flex: 1; padding: 10px; background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white; border: none; border-radius: 8px; cursor: pointer;
 }
-
-.register-link a:hover {
-  text-decoration: underline;
-}
-
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 10px;
-  padding: 30px;
-  width: 90%;
-  max-width: 400px;
-}
-
-.modal-content h3 {
-  margin-bottom: 20px;
-  color: #333;
-  text-align: center;
-}
-
-.modal-buttons {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 30px;
-}
-
-.modal-buttons button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.modal-buttons button:first-child {
-  background: #4a6cf7;
-  color: white;
-}
-
-.modal-buttons button:last-child {
-  background: #ddd;
-  color: #333;
+.btn-cancel {
+  flex: 1; padding: 10px; background: #f0f0f0;
+  color: #333; border: none; border-radius: 8px; cursor: pointer;
 }
 </style>

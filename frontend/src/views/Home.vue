@@ -1,47 +1,36 @@
 <template>
-  <div class="home-container">
-    <div class="home-header">
-      <div class="header-top">
-        <h2>当前可预约座位</h2>
-        <button class="profile-button" @click="goToProfile">个人中心</button>
-      </div>
-      <div class="area-selector">
-        <select v-model="selectedAreaId" @change="getSeats">
-          <option value="">选择区域</option>
-          <option v-for="area in areas" :key="area.id" :value="area.id">{{ area.name }}</option>
-        </select>
+  <div class="home-page">
+    <div class="top-bar">
+      <h3 class="title">📚 自习座位预约</h3>
+      <div class="top-actions">
+        <button class="ai-btn" @click="$router.push('/ai-assistant')">🤖 AI 助手</button>
+        <button class="profile-btn" @click="$router.push('/my-reservations')">👤 我的</button>
       </div>
     </div>
-    
+    <div class="filter-bar">
+      <span>选择区域：</span>
+      <select v-model="selectedAreaId" @change="getSeats">
+        <option value="">全部区域</option>
+        <option v-for="area in areas" :key="area.id" :value="area.id">{{ area.name }} ({{ area.floor }}F)</option>
+      </select>
+    </div>
     <div class="seat-grid">
-      <div v-for="seat in seats" :key="seat.id" 
-           :class="['seat', getSeatClass(seat.status)]"
+      <div v-for="seat in seats" :key="seat.id"
+           :class="['seat-item', statusClass(seat.status)]"
            @click="selectSeat(seat)">
-        <span class="seat-number">{{ seat.seatNumber }}</span>
-        <span v-if="seat.status === '空闲'" class="available">可预约</span>
+        <span class="seat-num">{{ seat.seatNumber }}</span>
+        <span class="seat-label">{{ statusText(seat.status) }}</span>
       </div>
     </div>
-    
-    <div class="status-legend">
-      <div class="legend-item">
-        <div class="legend-color available"></div>
-        <span>可预约</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color reserved"></div>
-        <span>已预约</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color occupied"></div>
-        <span>已占用</span>
-      </div>
+    <div class="legend">
+      <span v-for="item in legendItems" :key="item.text">
+        <i :style="{color: item.color}">●</i> {{ item.text }}
+      </span>
     </div>
-    
     <div v-if="selectedSeat" class="seat-detail">
-      <h3>座位详情</h3>
-      <p>座位号：{{ selectedSeat.seatNumber }}</p>
-      <p>状态：{{ getStatusText(selectedSeat.status) }}</p>
-      <button v-if="selectedSeat.status === '空闲'" class="reserve-button" @click="goToSeatSelection">预约</button>
+      <p><strong>{{ selectedSeat.seatNumber }}</strong> · {{ selectedAreaName }} · {{ statusText(selectedSeat.status) }}</p>
+      <button v-if="selectedSeat.status === '空闲'" class="reserve-btn"
+              @click="goReserve">预约此座位</button>
     </div>
   </div>
 </template>
@@ -54,247 +43,113 @@ export default {
       areas: [],
       seats: [],
       selectedAreaId: '',
-      selectedSeat: null
+      selectedSeat: null,
+      legendItems: [
+        { text: '空闲', color: '#52c41a' },
+        { text: '已预约', color: '#fa8c16' },
+        { text: '占用', color: '#999' },
+        { text: '暂离', color: '#1890ff' },
+      ]
     }
   },
-  mounted() {
-    this.getAreas()
+  computed: {
+    selectedAreaName() {
+      const a = this.areas.find(a => a.id === this.selectedAreaId)
+      return a ? a.name : ''
+    }
   },
+  mounted() { this.getAreas() },
   methods: {
     async getAreas() {
-      const response = await fetch('/api/student/areas')
-      const result = await response.json()
-      if (result.code === 200) {
-        this.areas = result.data
-      }
+      const resp = await fetch('/api/student/areas')
+      const r = await resp.json()
+      if (r.code === 200) this.areas = r.data
     },
     async getSeats() {
-      if (this.selectedAreaId) {
-        const response = await fetch(`/api/student/seats?areaId=${this.selectedAreaId}`)
-        const result = await response.json()
-        if (result.code === 200) {
-          this.seats = result.data
-        }
-      } else {
-        this.seats = []
-      }
+      if (!this.selectedAreaId) { this.seats = []; this.selectedSeat = null; return }
+      const resp = await fetch(`/api/student/seats?areaId=${this.selectedAreaId}`)
+      const r = await resp.json()
+      if (r.code === 200) this.seats = r.data
       this.selectedSeat = null
     },
-    selectSeat(seat) {
-      this.selectedSeat = seat
-    },
-    goToSeatSelection() {
+    selectSeat(seat) { this.selectedSeat = seat },
+    goReserve() {
       this.$router.push({
         path: '/seat-selection',
         query: { seatId: this.selectedSeat.id, areaId: this.selectedAreaId }
       })
     },
-    getSeatClass(status) {
-      const classMap = {
-        '空闲': '可预约',
-        '已预约': '已预约',
-        '占用': '已占用',
-        '暂离': '暂离',
-        '禁用': '禁用'
-      }
-      return classMap[status] || status
+    statusClass(s) {
+      const m = { '空闲':'free', '已预约':'reserved', '占用':'occupied', '暂离':'away', '禁用':'disabled' }
+      return m[s] || 'occupied'
     },
-    getStatusText(status) {
-      const textMap = {
-        '空闲': '空闲',
-        '已预约': '已预约',
-        '占用': '已占用',
-        '暂离': '暂离',
-        '禁用': '禁用'
-      }
-      return textMap[status] || status
-    },
-    goToProfile() {
-      this.$router.push('/my-reservations')
+    statusText(s) {
+      const m = { '空闲':'空闲', '已预约':'已预约', '占用':'占用', '暂离':'暂离', '禁用':'禁用' }
+      return m[s] || s
     }
   }
 }
 </script>
 
 <style scoped>
-.home-container {
-  background: white;
-  border-radius: 10px;
-  padding: 30px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 800px;
+.home-page { min-height: 100vh; background: #f5f6fa; }
+.top-bar {
+  background: white; padding: 14px 20px;
+  display: flex; justify-content: space-between; align-items: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-
-.home-header {
-  margin-bottom: 30px;
+.title { font-size: 18px; color: #333; margin: 0; }
+.top-actions { display: flex; gap: 10px; }
+.ai-btn {
+  padding: 6px 14px; border-radius: 20px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white; font-size: 13px; font-weight: bold;
 }
-
-.header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+.profile-btn {
+  padding: 6px 14px; border-radius: 20px; border: none; cursor: pointer;
+  background: #f0f0f0; font-size: 13px;
 }
-
-.header-top h2 {
-  text-align: center;
-  color: #333;
-  margin: 0;
+.filter-bar {
+  padding: 16px 20px; display: flex; gap: 10px; align-items: center;
+  font-size: 14px; color: #666;
 }
-
-.profile-button {
-  padding: 8px 16px;
-  background: #4a6cf7;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  font-size: 14px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s ease;
+.filter-bar select {
+  padding: 8px 14px; border: 1.5px solid #e0e0e0; border-radius: 8px;
+  font-size: 14px; background: white;
 }
-
-.profile-button:hover {
-  background: #3a56d7;
-}
-
-.area-selector {
-  display: flex;
-  justify-content: center;
-}
-
-.area-selector select {
-  padding: 10px 20px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 16px;
-}
-
 .seat-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 15px;
-  margin-bottom: 30px;
+  padding: 0 20px; display: grid;
+  grid-template-columns: repeat(5, 1fr); gap: 10px;
 }
-
-.seat {
-  width: 80px;
-  height: 80px;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
+.seat-item {
+  aspect-ratio: 1; border-radius: 10px; border: 2px solid #eee;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; transition: transform 0.2s;
 }
-
-.seat:hover {
-  transform: scale(1.05);
+.seat-item:hover { transform: scale(1.05); }
+.seat-item.free { background: #e6f7ee; border-color: #52c41a; }
+.seat-item.reserved { background: #fff1e6; border-color: #fa8c16; }
+.seat-item.occupied { background: #f0f0f0; border-color: #d9d9d9; }
+.seat-item.away { background: #e6f7ff; border-color: #1890ff; }
+.seat-item.disabled { background: #fff2f0; border-color: #ff4d4f; }
+.seat-num { font-size: 14px; font-weight: bold; color: #333; }
+.seat-label { font-size: 11px; margin-top: 2px; }
+.seat-item.free .seat-label { color: #52c41a; }
+.seat-item.reserved .seat-label { color: #fa8c16; }
+.seat-item.occupied .seat-label { color: #999; }
+.seat-item.away .seat-label { color: #1890ff; }
+.legend {
+  padding: 16px 20px; display: flex; gap: 18px; justify-content: center;
+  font-size: 12px; color: #999;
 }
-
-.seat.可预约 {
-  background: #e6f7ee;
-  border: 2px solid #52c41a;
-}
-
-.seat.已预约 {
-  background: #fff1e6;
-  border: 2px solid #fa8c16;
-}
-
-.seat.已占用 {
-  background: #f0f0f0;
-  border: 2px solid #d9d9d9;
-}
-
-.seat.暂离 {
-  background: #e6f7ff;
-  border: 2px solid #1890ff;
-}
-
-.seat.禁用 {
-  background: #fff2f0;
-  border: 2px solid #ff4d4f;
-}
-
-.seat-number {
-  font-size: 16px;
-  font-weight: bold;
-  color: #333;
-}
-
-.available {
-  font-size: 12px;
-  color: #52c41a;
-  margin-top: 5px;
-}
-
-.status-legend {
-  display: flex;
-  justify-content: center;
-  gap: 30px;
-  margin-bottom: 30px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.legend-color {
-  width: 20px;
-  height: 20px;
-  border-radius: 3px;
-}
-
-.legend-color.available {
-  background: #e6f7ee;
-  border: 2px solid #52c41a;
-}
-
-.legend-color.reserved {
-  background: #fff1e6;
-  border: 2px solid #fa8c16;
-}
-
-.legend-color.occupied {
-  background: #f0f0f0;
-  border: 2px solid #d9d9d9;
-}
-
 .seat-detail {
-  background: #f5f5f5;
-  padding: 20px;
-  border-radius: 10px;
-  text-align: center;
+  margin: 0 20px 20px; background: white; border-radius: 12px;
+  padding: 16px; text-align: center;
 }
-
-.seat-detail h3 {
-  margin-bottom: 15px;
-  color: #333;
-}
-
-.seat-detail p {
-  margin-bottom: 10px;
-  color: #666;
-}
-
-.reserve-button {
-  padding: 10px 30px;
-  background: #4a6cf7;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  margin-top: 15px;
-}
-
-.reserve-button:hover {
-  background: #3a56d7;
+.seat-detail p { font-size: 14px; color: #333; margin-bottom: 10px; }
+.reserve-btn {
+  padding: 10px 30px; background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white; border: none; border-radius: 10px; font-size: 15px;
+  font-weight: bold; cursor: pointer;
 }
 </style>
