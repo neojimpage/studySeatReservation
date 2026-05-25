@@ -17,6 +17,7 @@ public class User {
     private String name;
     private Integer violationCount;
     private Boolean isRestricted;
+    private String role; // student or admin
     private LocalDateTime lastLoginTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

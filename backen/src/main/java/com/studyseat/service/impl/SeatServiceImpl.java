@@ -19,7 +19,12 @@ public class SeatServiceImpl implements SeatService {
     public List<Seat> getSeatsByAreaId(Long areaId) {
         return seatMapper.findByAreaId(areaId);
     }
-    
+
+    @Override
+    public List<Seat> getAllSeats() {
+        return seatMapper.selectList(null);
+    }
+
     @Override
     public Seat getById(Long id) {
         return seatMapper.selectById(id);

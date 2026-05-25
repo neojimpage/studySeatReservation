@@ -17,9 +17,14 @@ public class SeatController {
     private SeatService seatService;
     
     @GetMapping("/seats")
-    public Map<String, Object> getSeats(@RequestParam Long areaId) {
+    public Map<String, Object> getSeats(@RequestParam(required = false) Long areaId) {
         Map<String, Object> result = new HashMap<>();
-        List<Seat> seats = seatService.getSeatsByAreaId(areaId);
+        List<Seat> seats;
+        if (areaId != null) {
+            seats = seatService.getSeatsByAreaId(areaId);
+        } else {
+            seats = seatService.getAllSeats();
+        }
         result.put("code", 200);
         result.put("message", "获取成功");
         result.put("data", seats);

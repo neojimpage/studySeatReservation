@@ -47,6 +47,7 @@ public class UserServiceImpl implements UserService {
         user.setPassword(studentId.substring(Math.max(0, len - 6)));
         user.setViolationCount(0);
         user.setIsRestricted(false);
+        user.setRole("student");
         user.setCreateTime(LocalDateTime.now());
         user.setUpdateTime(LocalDateTime.now());
         userMapper.insert(user);

@@ -17,3 +17,6 @@ mybatis-plus:
   type-aliases-package: com.studyseat.entity
   configuration:
     map-underscore-to-camel-case: true
+
+ai-service:
+  url: http://localhost:8000
