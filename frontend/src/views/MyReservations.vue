@@ -1,90 +1,47 @@
 <template>
-  <div class="my-reservations-container">
-    <div class="header">
-      <button class="back-button" @click="$router.back()">返回</button>
-      <h2>我的预约</h2>
+  <div class="page">
+    <div class="tab-bar">
+      <div v-for="t in tabs" :key="t.key"
+           :class="['tab', { active: activeTab === t.key }]"
+           @click="activeTab = t.key">{{ t.label }}</div>
     </div>
-    
-    <div class="tabs">
-      <button :class="['tab', { active: activeTab === 'current' }]" @click="activeTab = 'current'">当前预约</button>
-      <button :class="['tab', { active: activeTab === 'history' }]" @click="activeTab = 'history'">历史预约</button>
-      <button :class="['tab', { active: activeTab === 'profile' }]" @click="activeTab = 'profile'">个人中心</button>
-    </div>
-    
-    <div v-if="activeTab === 'current'" class="tab-content">
-      <div v-if="currentReservations.length === 0" class="empty-state">
-        <p>暂无当前预约</p>
-      </div>
-      <div v-else class="reservation-list">
-        <div v-for="reservation in currentReservations" :key="reservation.id" class="reservation-item">
-          <div class="reservation-info">
-            <div class="info-row">
-              <span class="label">座位号：</span>
-              <span class="value">{{ getSeatNumber(reservation.seatId) }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">时间：</span>
-              <span class="value">{{ formatDateTime(reservation.startTime) }} - {{ formatDateTime(reservation.endTime) }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">状态：</span>
-              <span :class="['status', reservation.status]">{{ reservation.status }}</span>
-            </div>
-          </div>
-          <div class="reservation-actions">
-            <button v-if="reservation.status === '已预约'" class="action-button cancel" @click="cancelReservation(reservation.id)">取消</button>
-            <button v-if="reservation.status === '已开始'" class="action-button leave" @click="leave(reservation.id)">暂离</button>
-            <button v-if="reservation.status === '暂离'" class="action-button back" @click="back(reservation.id)">返回</button>
-            <button v-if="reservation.status === '已开始' || reservation.status === '暂离'" class="action-button finish" @click="finish(reservation.id)">结束</button>
-          </div>
+
+    <div v-if="activeTab === 'current'" class="content">
+      <div v-if="currentReservations.length === 0" class="empty">暂无当前预约</div>
+      <div v-for="r in currentReservations" :key="r.id" class="card">
+        <div class="card-left">
+          <span class="seat-name">{{ seats[r.seatId]?.seatNumber || '未知' }}</span>
+          <span :class="['badge', badgeClass(r.status)]">{{ r.status }}</span>
+          <span class="time">📅 {{ fmt(r.startTime) }} - {{ fmt(r.endTime) }}</span>
+        </div>
+        <div class="card-right">
+          <button v-if="r.status === '已预约'" class="btn btn-red" @click="cancelReservation(r.id)">取消</button>
+          <button v-if="r.status === '已开始'" class="btn btn-blue" @click="leave(r.id)">暂离</button>
+          <button v-if="r.status === '暂离'" class="btn btn-green" @click="back(r.id)">返回</button>
+          <button v-if="r.status === '已开始' || r.status === '暂离'" class="btn btn-orange" @click="finish(r.id)">结束</button>
         </div>
       </div>
     </div>
-    
-    <div v-if="activeTab === 'history'" class="tab-content">
-      <div v-if="historyReservations.length === 0" class="empty-state">
-        <p>暂无历史预约</p>
-      </div>
-      <div v-else class="reservation-list">
-        <div v-for="reservation in historyReservations" :key="reservation.id" class="reservation-item">
-          <div class="reservation-info">
-            <div class="info-row">
-              <span class="label">座位号：</span>
-              <span class="value">{{ getSeatNumber(reservation.seatId) }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">时间：</span>
-              <span class="value">{{ formatDateTime(reservation.startTime) }} - {{ formatDateTime(reservation.endTime) }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">状态：</span>
-              <span :class="['status', reservation.status]">{{ reservation.status }}</span>
-            </div>
-          </div>
+
+    <div v-if="activeTab === 'history'" class="content">
+      <div v-if="historyReservations.length === 0" class="empty">暂无历史预约</div>
+      <div v-for="r in historyReservations" :key="r.id" class="card">
+        <div class="card-left">
+          <span class="seat-name">{{ seats[r.seatId]?.seatNumber || '未知' }}</span>
+          <span :class="['badge', badgeClass(r.status)]">{{ r.status }}</span>
+          <span class="time">📅 {{ fmt(r.startTime) }} - {{ fmt(r.endTime) }}</span>
         </div>
       </div>
     </div>
-    
-    <div v-if="activeTab === 'profile'" class="tab-content">
-      <div class="profile-info">
-        <div class="info-row">
-          <span class="label">学号：</span>
-          <span class="value">{{ user?.studentId }}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">姓名：</span>
-          <span class="value">{{ user?.name }}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">违规次数：</span>
-          <span class="value">{{ user?.violationCount || 0 }}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">账号状态：</span>
-          <span :class="['status', user?.isRestricted ? 'restricted' : 'normal']">{{ user?.isRestricted ? '已限制' : '正常' }}</span>
-        </div>
+
+    <div v-if="activeTab === 'profile'" class="content">
+      <div class="profile-card">
+        <div class="info-row"><span>学号</span><span>{{ user?.studentId }}</span></div>
+        <div class="info-row"><span>姓名</span><span>{{ user?.name }}</span></div>
+        <div class="info-row"><span>违规次数</span><span :class="user?.violationCount > 0 ? 'text-red' : 'text-green'">{{ user?.violationCount || 0 }}</span></div>
+        <div class="info-row"><span>账号状态</span><span :class="user?.isRestricted ? 'text-red' : 'text-green'">{{ user?.isRestricted ? '已限制' : '正常' }}</span></div>
       </div>
-      <button class="logout-button" @click="logout">退出登录</button>
+      <button class="logout-btn" @click="logout">退出登录</button>
     </div>
   </div>
 </template>
@@ -95,385 +52,66 @@ export default {
   data() {
     return {
       activeTab: 'current',
-      currentReservations: [],
-      historyReservations: [],
-      user: null,
-      seats: {}
+      tabs: [{ key:'current', label:'当前预约' }, { key:'history', label:'历史预约' }, { key:'profile', label:'个人中心' }],
+      currentReservations: [], historyReservations: [], user: null, seats: {}
     }
   },
-  mounted() {
-    this.initData()
-  },
+  mounted() { this.user = JSON.parse(localStorage.getItem('user')); if (this.user) { this.loadCurrent(); this.loadHistory() } },
   methods: {
-    async initData() {
-      const user = JSON.parse(localStorage.getItem('user'))
-      if (user) {
-        this.user = user
-        await this.getCurrentReservations()
-        await this.getHistoryReservations()
-      }
+    async loadCurrent() {
+      const r = await fetch(`/api/student/reservations/current?userId=${this.user.id}`)
+      const j = await r.json()
+      if (j.code === 200) { this.currentReservations = j.data; j.data.forEach(res => this.getSeat(res.seatId)) }
     },
-    async getCurrentReservations() {
-      const user = JSON.parse(localStorage.getItem('user'))
-      if (user) {
-        const response = await fetch(`/api/student/reservations/current?userId=${user.id}`)
-        const result = await response.json()
-        if (result.code === 200) {
-          this.currentReservations = result.data
-          for (const reservation of this.currentReservations) {
-            await this.getSeatInfo(reservation.seatId)
-          }
-        }
-      }
+    async loadHistory() {
+      const r = await fetch(`/api/student/reservations?userId=${this.user.id}`)
+      const j = await r.json()
+      if (j.code === 200) { this.historyReservations = j.data.filter(res => ['已结束','已取消','爽约'].includes(res.status)); j.data.forEach(res => this.getSeat(res.seatId)) }
     },
-    async getHistoryReservations() {
-      const user = JSON.parse(localStorage.getItem('user'))
-      if (user) {
-        const response = await fetch(`/api/student/reservations?userId=${user.id}`)
-        const result = await response.json()
-        if (result.code === 200) {
-          this.historyReservations = result.data.filter(res => res.status === '已结束' || res.status === '已取消' || res.status === '爽约')
-          for (const reservation of this.historyReservations) {
-            await this.getSeatInfo(reservation.seatId)
-          }
-        }
-      }
+    async getSeat(id) {
+      if (!this.seats[id]) { const r = await fetch(`/api/student/seats/${id}`); const j = await r.json(); if (j.code === 200) this.seats[id] = j.data }
     },
-    async getSeatInfo(seatId) {
-      if (!this.seats[seatId]) {
-        const response = await fetch(`/api/student/seats/${seatId}`)
-        const result = await response.json()
-        if (result.code === 200) {
-          this.seats[seatId] = result.data
-        }
-      }
-    },
-    getSeatNumber(seatId) {
-      return this.seats[seatId]?.seatNumber || '未知'
-    },
-    formatDateTime(dateTime) {
-      const date = new Date(dateTime)
-      return date.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    },
-    async cancelReservation(reservationId) {
-      const user = JSON.parse(localStorage.getItem('user'))
-      if (user) {
-        try {
-          const response = await fetch(`/api/student/reservations/${reservationId}/cancel`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-              userId: user.id
-            })
-          })
-          const result = await response.json()
-          if (result.code === 200) {
-            alert('取消成功')
-            this.getCurrentReservations()
-          } else {
-            alert(result.message)
-          }
-        } catch (error) {
-          console.error('取消预约失败:', error)
-          alert('取消预约失败，请稍后重试')
-        }
-      }
-    },
-    async leave(reservationId) {
-      const user = JSON.parse(localStorage.getItem('user'))
-      if (user) {
-        const response = await fetch(`/api/student/reservations/${reservationId}/leave`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            userId: user.id
-          })
-        })
-        const result = await response.json()
-        if (result.code === 200) {
-          alert('暂离成功')
-          this.getCurrentReservations()
-        } else {
-          alert(result.message)
-        }
-      }
-    },
-    async back(reservationId) {
-      const user = JSON.parse(localStorage.getItem('user'))
-      if (user) {
-        const response = await fetch(`/api/student/reservations/${reservationId}/back`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            userId: user.id
-          })
-        })
-        const result = await response.json()
-        if (result.code === 200) {
-          alert('返回成功')
-          this.getCurrentReservations()
-        } else {
-          alert(result.message)
-        }
-      }
-    },
-    async finish(reservationId) {
-      const user = JSON.parse(localStorage.getItem('user'))
-      if (user) {
-        const response = await fetch(`/api/student/reservations/${reservationId}/finish`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            userId: user.id
-          })
-        })
-        const result = await response.json()
-        if (result.code === 200) {
-          alert('结束成功')
-          this.getCurrentReservations()
-          this.getHistoryReservations()
-        } else {
-          alert(result.message)
-        }
-      }
-    },
-    logout() {
-      localStorage.removeItem('user')
-      this.$router.push('/')
-    }
+    badgeClass(s) { const m = { '已预约':'badge-orange', '已开始':'badge-green', '暂离':'badge-blue', '已结束':'badge-gray', '已取消':'badge-red', '爽约':'badge-red' }; return m[s] || 'badge-gray' },
+    fmt(d) { return new Date(d).toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) },
+    async cancelReservation(id) { await this.action(() => fetch(`/api/student/reservations/${id}/cancel`, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({userId:this.user.id}) }), '取消成功') },
+    async leave(id) { await this.action(() => fetch(`/api/student/reservations/${id}/leave`, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({userId:this.user.id}) }), '暂离成功') },
+    async back(id) { await this.action(() => fetch(`/api/student/reservations/${id}/back`, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({userId:this.user.id}) }), '返回成功') },
+    async finish(id) { await this.action(() => fetch(`/api/student/reservations/${id}/finish`, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({userId:this.user.id}) }), '结束成功') },
+    async action(fn, ok) { const r = await fn(); const j = await r.json(); if (j.code === 200) { alert(ok); this.loadCurrent(); this.loadHistory() } else alert(j.message) },
+    logout() { localStorage.removeItem('user'); this.$router.push('/') }
   }
 }
 </script>
 
 <style scoped>
-.my-reservations-container {
-  background: white;
-  border-radius: 10px;
-  padding: 30px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 800px;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 30px;
-}
-
-.back-button {
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-  margin-right: 20px;
-  color: #666;
-}
-
-.header h2 {
-  color: #333;
-}
-
-.tabs {
-  display: flex;
-  margin-bottom: 30px;
-  border-bottom: 1px solid #ddd;
-}
-
-.tab {
-  padding: 15px 30px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 16px;
-  color: #666;
-  border-bottom: 2px solid transparent;
-  transition: all 0.3s ease;
-}
-
-.tab:hover {
-  color: #4a6cf7;
-}
-
-.tab.active {
-  color: #4a6cf7;
-  border-bottom-color: #4a6cf7;
-  font-weight: bold;
-}
-
-.tab-content {
-  min-height: 300px;
-}
-
-.empty-state {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 300px;
-  color: #999;
-  font-size: 18px;
-}
-
-.reservation-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.reservation-item {
-  background: #f5f5f5;
-  padding: 20px;
-  border-radius: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.reservation-info {
-  flex: 1;
-}
-
-.info-row {
-  margin-bottom: 10px;
-  display: flex;
-  gap: 10px;
-}
-
-.info-row:last-child {
-  margin-bottom: 0;
-}
-
-.label {
-  color: #666;
-  font-weight: bold;
-  min-width: 80px;
-}
-
-.value {
-  color: #333;
-}
-
-.status {
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-.status.已预约 {
-  background: #fff1e6;
-  color: #fa8c16;
-}
-
-.status.已开始 {
-  background: #e6f7ee;
-  color: #52c41a;
-}
-
-.status.已结束 {
-  background: #f0f0f0;
-  color: #999;
-}
-
-.status.已取消 {
-  background: #fff2f0;
-  color: #ff4d4f;
-}
-
-.status.爽约 {
-  background: #fff2f0;
-  color: #ff4d4f;
-}
-
-.status.暂离 {
-  background: #e6f7ff;
-  color: #1890ff;
-}
-
-.status.normal {
-  background: #e6f7ee;
-  color: #52c41a;
-}
-
-.status.restricted {
-  background: #fff2f0;
-  color: #ff4d4f;
-}
-
-.reservation-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.action-button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 5px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.action-button.cancel {
-  background: #ff4d4f;
-  color: white;
-}
-
-.action-button.leave {
-  background: #1890ff;
-  color: white;
-}
-
-.action-button.back {
-  background: #52c41a;
-  color: white;
-}
-
-.action-button.finish {
-  background: #fa8c16;
-  color: white;
-}
-
-.action-button:hover {
-  opacity: 0.9;
-}
-
-.profile-info {
-  background: #f5f5f5;
-  padding: 20px;
-  border-radius: 10px;
-  margin-bottom: 30px;
-}
-
-.logout-button {
-  width: 100%;
-  padding: 15px;
-  background: #ff4d4f;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.logout-button:hover {
-  background: #ff7875;
-}
+.page { min-height: 100vh; background: #f5f6fa; }
+.tab-bar { display: flex; background: white; border-bottom: 1px solid #eee; }
+.tab { flex: 1; text-align: center; padding: 14px; font-size: 14px; color: #999; cursor: pointer; border-bottom: 2px solid transparent; }
+.tab.active { color: #667eea; border-bottom-color: #667eea; font-weight: bold; }
+.content { padding: 16px; }
+.empty { text-align: center; padding: 80px 0; color: #999; font-size: 16px; }
+.card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+.card-left { display: flex; flex-direction: column; gap: 4px; }
+.seat-name { font-weight: bold; font-size: 16px; color: #333; }
+.time { font-size: 13px; color: #666; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: bold; width: fit-content; }
+.badge-green { background: #e6f7ee; color: #52c41a; }
+.badge-orange { background: #fff1e6; color: #fa8c16; }
+.badge-blue { background: #e6f7ff; color: #1890ff; }
+.badge-gray { background: #f0f0f0; color: #999; }
+.badge-red { background: #fff2f0; color: #ff4d4f; }
+.card-right { display: flex; flex-direction: column; gap: 6px; }
+.btn { padding: 5px 12px; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; color: white; }
+.btn-red { background: #ff4d4f; }
+.btn-blue { background: #1890ff; }
+.btn-green { background: #52c41a; }
+.btn-orange { background: #fa8c16; }
+.profile-card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+.info-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 14px; border-bottom: 1px solid #f5f5f5; }
+.info-row:last-child { border-bottom: none; }
+.info-row span:first-child { color: #999; }
+.info-row span:last-child { color: #333; font-weight: bold; }
+.text-red { color: #ff4d4f; }
+.text-green { color: #52c41a; }
+.logout-btn { width: 100%; padding: 14px; background: #ff4d4f; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
 </style>
